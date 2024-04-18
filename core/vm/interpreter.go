@@ -37,6 +37,17 @@ type ScopeContext struct {
 	Memory   *Memory
 	Stack    *Stack
 	Contract *Contract
+
+	// For DFG Generation
+	metaMemory  *MetaMemory
+	metaStack   *MetaStack
+	metaStorage *MetaStorage
+
+	opCodeCounter          *int
+	memory_len_last_modify int
+
+	metaBalance *MetaAccount
+	metaCode    *MetaAccount
 }
 
 // EVMInterpreter represents an EVM interpreter
@@ -47,8 +58,9 @@ type EVMInterpreter struct {
 	hasher    crypto.KeccakState // Keccak256 hasher instance shared across opcodes
 	hasherBuf common.Hash        // Keccak256 hasher result array shared across opcodes
 
-	readOnly   bool   // Whether to throw on stateful modifications
-	returnData []byte // Last CALL's return data for subsequent reuse
+	readOnly    bool   // Whether to throw on stateful modifications
+	returnData  []byte // Last CALL's return data for subsequent reuse
+	sourceIndex int
 }
 
 // NewEVMInterpreter returns a new instance of the Interpreter.
@@ -95,7 +107,7 @@ func NewEVMInterpreter(evm *EVM) *EVMInterpreter {
 		}
 	}
 	evm.Config.ExtraEips = extraEips
-	return &EVMInterpreter{evm: evm, table: table}
+	return &EVMInterpreter{evm: evm, table: table, sourceIndex: -1}
 }
 
 // Run loops and evaluates the contract's code with the given input data and returns
@@ -126,14 +138,10 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	}
 
 	var (
-		op          OpCode        // current opcode
-		mem         = NewMemory() // bound memory
-		stack       = newstack()  // local stack
-		callContext = &ScopeContext{
-			Memory:   mem,
-			Stack:    stack,
-			Contract: contract,
-		}
+		op OpCode // current opcode
+		// 新建的memory没有size，所以不用管
+		mem   = NewMemory() // bound memory
+		stack = newstack()  // local stack
 		// For optimisation reason we're using uint64 as the program counter.
 		// It's theoretically possible to go above 2^64. The YP defines the PC
 		// to be uint256. Practically much less so feasible.
@@ -145,6 +153,19 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		logged  bool   // deferred EVMLogger should ignore already logged steps
 		res     []byte // result of the opcode execution function
 		debug   = in.evm.Config.Tracer != nil
+
+		callContext = &ScopeContext{
+			Memory:   mem,
+			Stack:    stack,
+			Contract: contract,
+
+			metaMemory:    in.evm.metaMemory,
+			metaStack:     in.evm.metaStack,
+			metaStorage:   in.evm.metaStorage,
+			metaBalance:   in.evm.metaBalance,
+			metaCode:      in.evm.metaCode,
+			opCodeCounter: &in.evm.opCodeCounter,
+		}
 	)
 	// Don't move this deferred function, it's placed before the capturestate-deferred method,
 	// so that it get's executed _after_: the capturestate needs the stacks before
@@ -221,6 +242,8 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			}
 			if memorySize > 0 {
 				mem.Resize(memorySize)
+				callContext.metaMemory.Resize(memorySize)
+				callContext.memory_len_last_modify = *callContext.opCodeCounter
 			}
 		} else if debug {
 			in.evm.Config.Tracer.CaptureState(pc, op, gasCopy, cost, callContext, in.returnData, in.evm.depth, err)
@@ -232,6 +255,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 			break
 		}
 		pc++
+		*callContext.opCodeCounter++ // the only index
 	}
 
 	if err == errStopToken {

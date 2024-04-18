@@ -940,6 +940,10 @@ func (s *StateDB) SetTxContext(thash common.Hash, ti int) {
 	s.txIndex = ti
 }
 
+func (s *StateDB) GetTxId() int {
+	return s.txIndex
+}
+
 func (s *StateDB) clearJournalAndRefund() {
 	if len(s.journal.entries) > 0 {
 		s.journal = newJournal()

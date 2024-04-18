@@ -53,18 +53,19 @@ type Contract struct {
 	jumpdests map[common.Hash]bitvec // Aggregated result of JUMPDEST analysis.
 	analysis  bitvec                 // Locally cached result of JUMPDEST analysis
 
-	Code     []byte
-	CodeHash common.Hash
-	CodeAddr *common.Address
-	Input    []byte
+	Code        []byte
+	CodeHash    common.Hash
+	CodeAddr    *common.Address
+	Input       []byte
+	SourceIndex int // 标记这个合约对象是从哪里创建的，是opcode还是eoa创建的
 
 	Gas   uint64
 	value *big.Int
 }
 
 // NewContract returns a new contract environment for the execution of EVM.
-func NewContract(caller ContractRef, object ContractRef, value *big.Int, gas uint64) *Contract {
-	c := &Contract{CallerAddress: caller.Address(), caller: caller, self: object}
+func NewContract(caller ContractRef, object ContractRef, value *big.Int, gas uint64, sourceIndex int) *Contract {
+	c := &Contract{CallerAddress: caller.Address(), caller: caller, self: object, SourceIndex: sourceIndex}
 
 	if parent, ok := caller.(*Contract); ok {
 		// Reuse JUMPDEST analysis from parent context if available.
