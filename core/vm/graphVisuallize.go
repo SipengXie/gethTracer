@@ -18,18 +18,21 @@ func getNodesAndLinks(g *DependencyGraph) (nodes []opts.GraphNode, links []opts.
 
 	for _, vertex := range g.Vertexes {
 		byt, _ := json.Marshal(vertex)
+		// vid := vertex.Index
 		nodes = append(nodes, opts.GraphNode{
 			Name: string(byt),
 		})
 	}
 
 	for source, targets := range g.Edges {
-		sourceByt, _ := json.Marshal(g.Vertexes[source])
+		vsource := g.Vertexes[source]
+		vsbyt, _ := json.Marshal(vsource)
 		for target := range targets {
-			targetByt, _ := json.Marshal(g.Vertexes[target])
+			vtarget := g.Vertexes[target]
+			vtbyt, _ := json.Marshal(vtarget)
 			links = append(links, opts.GraphLink{
-				Source: string(sourceByt),
-				Target: string(targetByt),
+				Source: string(vsbyt),
+				Target: string(vtbyt),
 			})
 		}
 	}
@@ -40,12 +43,22 @@ func getNodesAndLinks(g *DependencyGraph) (nodes []opts.GraphNode, links []opts.
 func newChart(g *DependencyGraph) *charts.Graph {
 	graph := charts.NewGraph()
 	nodes, links := getNodesAndLinks(g)
-	graph.AddSeries("", nodes, links, charts.WithGraphChartOpts(
-		opts.GraphChart{
-			Layout:     "none",
-			EdgeSymbol: []string{"none", "arrow"},
-		},
-	))
+	graph.AddSeries("", nodes, links).SetSeriesOptions(
+		charts.WithGraphChartOpts(opts.GraphChart{
+			Layout:             "force",
+			Force:              &opts.GraphForce{Repulsion: 100},
+			Roam:               true,
+			FocusNodeAdjacency: true,
+			EdgeSymbol:         []string{"none", "arrow"},
+		}),
+		charts.WithEmphasisOpts(opts.Emphasis{
+			Label: &opts.Label{
+				Show:     true,
+				Color:    "black",
+				Position: "left",
+			},
+		}),
+	)
 	return graph
 }
 

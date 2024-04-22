@@ -17,6 +17,8 @@
 package vm
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -1016,7 +1018,8 @@ func opJumpi(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 }
 
 func opJumpdest(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
-
+	// 他不算一个正常的opcode
+	*scope.opCodeCounter--
 	return nil, nil
 }
 
@@ -1083,7 +1086,11 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 		bigVal = value.ToBig()
 	}
 
-	res, addr, returnGas, suberr := interpreter.evm.Create(scope.Contract, input, gas, bigVal, *scope.opCodeCounter)
+	interpreter.evm.Graph.Vertexes[newMetaRes.Index] = *newMetaRes
+	*scope.opCodeCounter++
+	res, addr, returnGas, suberr := interpreter.evm.Create(scope.Contract, input, gas, bigVal, newMetaRes.Index)
+	// *scope.opCodeCounter--
+
 	// Push item on the stack based on the returned error. If the ruleset is
 	// homestead we must check for CodeStoreOutOfGasError (homestead only
 	// rule) and treat as an error, if the ruleset is frontier we must
@@ -1145,8 +1152,12 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 	if !endowment.IsZero() {
 		bigEndowment = endowment.ToBig()
 	}
+	interpreter.evm.Graph.Vertexes[newMetaRes.Index] = *newMetaRes
+	*scope.opCodeCounter++
 	res, addr, returnGas, suberr := interpreter.evm.Create2(scope.Contract, input, gas,
-		bigEndowment, &salt, *scope.opCodeCounter)
+		bigEndowment, &salt, newMetaRes.Index)
+	// *scope.opCodeCounter--
+
 	// Push item on the stack based on the returned error.
 	if suberr != nil {
 		stackvalue.Clear()
@@ -1209,7 +1220,10 @@ func opCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byt
 		bigVal = value.ToBig()
 	}
 
-	ret, returnGas, err := interpreter.evm.Call(scope.Contract, toAddr, args, gas, bigVal, *scope.opCodeCounter)
+	interpreter.evm.Graph.Vertexes[newMetaRes.Index] = *newMetaRes
+	*scope.opCodeCounter++
+	ret, returnGas, err := interpreter.evm.Call(scope.Contract, toAddr, args, gas, bigVal, newMetaRes.Index)
+	// *scope.opCodeCounter--
 
 	if err != nil {
 		temp.Clear()
@@ -1264,8 +1278,11 @@ func opCallCode(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([
 		gas += params.CallStipend
 		bigVal = value.ToBig()
 	}
+	interpreter.evm.Graph.Vertexes[newMetaRes.Index] = *newMetaRes
+	*scope.opCodeCounter++
+	ret, returnGas, err := interpreter.evm.CallCode(scope.Contract, toAddr, args, gas, bigVal, newMetaRes.Index)
+	// *scope.opCodeCounter--
 
-	ret, returnGas, err := interpreter.evm.CallCode(scope.Contract, toAddr, args, gas, bigVal, *scope.opCodeCounter)
 	if err != nil {
 		temp.Clear()
 	} else {
@@ -1312,7 +1329,11 @@ func opDelegateCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 	// Get arguments from the memory.
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
-	ret, returnGas, err := interpreter.evm.DelegateCall(scope.Contract, toAddr, args, gas, *scope.opCodeCounter)
+	interpreter.evm.Graph.Vertexes[newMetaRes.Index] = *newMetaRes
+	*scope.opCodeCounter++
+	ret, returnGas, err := interpreter.evm.DelegateCall(scope.Contract, toAddr, args, gas, newMetaRes.Index)
+	// *scope.opCodeCounter--
+
 	if err != nil {
 		temp.Clear()
 	} else {
@@ -1358,7 +1379,11 @@ func opStaticCall(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) 
 	// Get arguments from the memory.
 	args := scope.Memory.GetPtr(int64(inOffset.Uint64()), int64(inSize.Uint64()))
 
-	ret, returnGas, err := interpreter.evm.StaticCall(scope.Contract, toAddr, args, gas, *scope.opCodeCounter)
+	interpreter.evm.Graph.Vertexes[newMetaRes.Index] = *newMetaRes
+	*scope.opCodeCounter++
+	ret, returnGas, err := interpreter.evm.StaticCall(scope.Contract, toAddr, args, gas, newMetaRes.Index)
+	// *scope.opCodeCounter--
+
 	if err != nil {
 		temp.Clear()
 	} else {
@@ -1423,6 +1448,7 @@ func opRevert(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]b
 
 // 没有对应的opcode，我们先跳过吧
 func opUndefined(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	*scope.opCodeCounter--
 	return nil, &ErrInvalidOpCode{opcode: OpCode(scope.Contract.Code[*pc])}
 }
 
@@ -1541,7 +1567,9 @@ func opPush1(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 
 	last_pc_modifer := interpreter.evm.Graph.Vertexes[newMetaRes.Index-1]
 	source := interpreter.evm.Graph.Vertexes[scope.Contract.SourceIndex]
-
+	if newMetaRes.Index == 1400 {
+		fmt.Println("debug")
+	}
 	interpreter.evm.Graph.AddDependency([]Metadata{last_pc_modifer, source}, *newMetaRes)
 	return nil, nil
 }

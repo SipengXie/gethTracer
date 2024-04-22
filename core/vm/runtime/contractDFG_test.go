@@ -24,15 +24,28 @@ func TestExecution(t *testing.T) {
 	evm := NewEnv(cfg)
 	userRef := vm.AccountRef(user)
 
-	code, addr, _, err := evm.Create(userRef, deployCode, cfg.GasLimit, big.NewInt(0), -1)
+	_, addr, _, err := evm.Create(userRef, deployCode, cfg.GasLimit, big.NewInt(0), -1)
 	if err != nil {
 		t.Fatalf("Failed to deploy contract: %v", err)
 	}
 
-	t.Log("Contract deployed at address", addr.Hex())
-	t.Log("Contract code", common.Bytes2Hex(code))
+	// t.Log("Contract deployed at address", addr.Hex())
+	// t.Log("Contract code", common.Bytes2Hex(code))
+	// graph := evm.Graph
+	// vm.VisualizeGraph(graph)
+
+	// fib1input := common.Hex2Bytes("4c803feb0000000000000000000000000000000000000000000000000000000000000003")
+	// fib2input := common.Hex2Bytes("3a9bbfcd0000000000000000000000000000000000000000000000000000000000000003")
+	// fib3input := common.Hex2Bytes("6b83dd2e0000000000000000000000000000000000000000000000000000000000000003")
+	fib4input := common.Hex2Bytes("b54630140000000000000000000000000000000000000000000000000000000000000003")
+
+	evm = NewEnv(cfg)
+	res, _, err := evm.Call(userRef, addr, fib4input, cfg.GasLimit, big.NewInt(0), -1)
+	if err != nil {
+		t.Fatalf("Failed to call contract: %v", err)
+	}
+	t.Log("Contract returned", res)
+
 	graph := evm.Graph
 	vm.VisualizeGraph(graph)
-	// input := common.Hex2Bytes("0xb5463014000000000000000000000000000000000000000000000000000000000000000a")
-
 }

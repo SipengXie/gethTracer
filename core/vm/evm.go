@@ -163,6 +163,8 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		metaStack:     newMetaStack(),
 		metaMemory:    newMetaMemory(),
 		metaStorage:   newMetaStorage(),
+		metaBalance:   newMetaAccount(),
+		metaCode:      newMetaAccount(),
 		opCodeCounter: 0,
 		Graph:         NewDependencyGraph(),
 	}
